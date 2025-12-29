@@ -1,153 +1,146 @@
 const Series = require('../models/seriesModel');
 const Rating = require('../models/ratingModel');
-const LikeHate = require('../models/likeHateModel');
+const Library = require('../models/libraryModel');
 
-const rankValues = {
-  'F': 1, 'D': 2, 'C': 3, 'B': 4, 'A': 5, 'S': 6, 'SS': 7, 'SSS': 8
-};
+const rankValues = { 'F': 1, 'D': 2, 'C': 3, 'B': 4, 'A': 5, 'S': 6, 'SS': 7, 'SSS': 8 };
 
-// ## Get All Series
 exports.getSeries = async (req, res) => {
   try {
     const { search, sort } = req.query;
     let query = {};
 
-    if (search) {
-      query.title = { $regex: search, $options: 'i' };
-    }
+    if (search) query.title = { $regex: search, $options: 'i' };
 
     let sortOption = { popularityScore: -1 };
-    if (sort === 'top_rated') {
-      sortOption = { averageRating: -1 };
-    } else if (sort === 'newest') {
-      sortOption = { releaseDate: -1 };
-    }
+    if (sort === 'top_rated') sortOption = { averageRating: -1 };
+    else if (sort === 'newest') sortOption = { releaseDate: -1 };
 
     const series = await Series.find(query).sort(sortOption).limit(50);
-
     res.status(200).json({ success: true, count: series.length, data: series });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 };
 
-// ## Get Single Series
 exports.getSeriesById = async (req, res) => {
   try {
     const series = await Series.findById(req.params.id);
-    if (!series) {
-      return res.status(404).json({ success: false, error: 'Series not found' });
-    }
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
     res.status(200).json({ success: true, data: series });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 };
 
-// ## Get Current User's Ratings
-exports.getMyRatings = async (req, res) => {
+exports.updateLibraryStatus = async (req, res) => {
   try {
-    const ratings = await Rating.find({ user: req.user.id })
-      .populate('series', 'title coverImage')
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({ success: true, count: ratings.length, data: ratings });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-};
-
-// ## Tap Series
-exports.tapSeries = async (req, res) => {
-  try {
-    const { type } = req.body;
+    const { status } = req.body;
     const seriesId = req.params.id;
     const userId = req.user.id;
 
-    const series = await Series.findById(seriesId);
-    if (!series) {
-      return res.status(404).json({ success: false, error: 'Series not found' });
+    if (status === 'remove') {
+      await Library.findOneAndDelete({ user: userId, series: seriesId });
+      return res.status(200).json({ success: true, data: null });
     }
 
-    const existingTap = await LikeHate.findOne({ user: userId, series: seriesId });
-
-    if (existingTap) {
-      if (existingTap.type === type) {
-        await existingTap.deleteOne();
-        if (type === 'like') series.simpleLikes = Math.max(0, series.simpleLikes - 1);
-        if (type === 'hate') series.simpleHates = Math.max(0, series.simpleHates - 1);
-      } else {
-        existingTap.type = type;
-        await existingTap.save();
-        
-        if (type === 'like') {
-          series.simpleLikes += 1;
-          series.simpleHates = Math.max(0, series.simpleHates - 1);
-        } else {
-          series.simpleHates += 1;
-          series.simpleLikes = Math.max(0, series.simpleLikes - 1);
-        }
-      }
-    } else {
-      await LikeHate.create({ user: userId, series: seriesId, type });
-      if (type === 'like') series.simpleLikes += 1;
-      if (type === 'hate') series.simpleHates += 1;
+    if (!['watching', 'watch_later'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    await series.save();
-    res.status(200).json({ success: true, data: series });
+    const entry = await Library.findOneAndUpdate(
+      { user: userId, series: seriesId },
+      { status, updatedAt: Date.now() },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({ success: true, data: entry });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 };
 
-// ## Rank Series
 exports.rankSeries = async (req, res) => {
   try {
     const { rank } = req.body;
     const seriesId = req.params.id;
     const userId = req.user.id;
 
-    if (!rankValues[rank]) {
-      return res.status(400).json({ success: false, error: 'Invalid Rank' });
-    }
+    if (!rankValues[rank]) return res.status(400).json({ success: false, error: 'Invalid Rank' });
 
     const series = await Series.findById(seriesId);
-    if (!series) {
-      return res.status(404).json({ success: false, error: 'Series not found' });
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+
+    const existingRating = await Rating.findOne({ user: userId, series: seriesId });
+    
+    const newScore = rankValues[rank];
+    let currentTotalScore = series.averageRating * series.voteCount;
+
+    if (existingRating) {
+      currentTotalScore -= existingRating.numericValue;
+      
+      const oldRank = existingRating.rank;
+      if (series.ratingDistribution && series.ratingDistribution[oldRank] > 0) {
+        series.ratingDistribution[oldRank]--;
+      }
+
+      existingRating.rank = rank;
+      existingRating.numericValue = newScore;
+      await existingRating.save();
+    } else {
+      await Rating.create({
+        rank,
+        numericValue: newScore,
+        series: seriesId,
+        user: userId
+      });
+
+      series.voteCount += 1;
     }
 
-    await Rating.create({
-      rank,
-      numericValue: rankValues[rank],
-      series: seriesId,
-      user: userId
-    });
-
-    if (!series.ratingDistribution) {
-        series.ratingDistribution = {}; 
+    currentTotalScore += newScore;
+    
+    if (series.voteCount > 0) {
+      series.averageRating = currentTotalScore / series.voteCount;
+    } else {
+      series.averageRating = 0;
     }
-    
-    series.ratingDistribution[rank] = (series.ratingDistribution[rank] || 0) + 1;
-    
-    const currentTotal = series.averageRating * series.voteCount;
-    series.voteCount += 1;
-    series.averageRating = (currentTotal + rankValues[rank]) / series.voteCount;
-    
+
     series.rankLabel = getLabelFromScore(series.averageRating);
+
+    if (!series.ratingDistribution) series.ratingDistribution = {};
+    series.ratingDistribution[rank] = (series.ratingDistribution[rank] || 0) + 1;
 
     await series.save();
 
     res.status(200).json({ success: true, data: series });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ success: false, error: 'You have already rated this series' });
-    }
     res.status(400).json({ success: false, error: error.message });
   }
 };
 
-// ## Helper Function
+exports.getMyProfileData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const rated = await Rating.find({ user: userId }).populate('series', 'title coverImage').sort('-createdAt');
+    const library = await Library.find({ user: userId }).populate('series', 'title coverImage').sort('-updatedAt');
+
+    const watching = library.filter(item => item.status === 'watching');
+    const watchLater = library.filter(item => item.status === 'watch_later');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        rated,
+        watching,
+        watchLater
+      }
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 const getLabelFromScore = (score) => {
   if (score >= 7.5) return 'SSS';
   if (score >= 6.5) return 'SS';

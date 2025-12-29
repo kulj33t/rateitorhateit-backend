@@ -2,22 +2,19 @@ const express = require('express');
 const { 
   getSeries, 
   getSeriesById, 
-  tapSeries, 
+  updateLibraryStatus, 
   rankSeries,
-  getMyRatings 
+  getMyProfileData 
 } = require('../controllers/seriesController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-
 router.get('/', getSeries);
 
-
-router.get('/my-ratings', protect, getMyRatings);
-router.post('/:id/tap', protect, tapSeries);
+router.get('/my-profile', protect, getMyProfileData);
+router.post('/:id/library', protect, updateLibraryStatus);
 router.post('/:id/rank', protect, rankSeries);
-
 
 router.get('/:id', getSeriesById);
 

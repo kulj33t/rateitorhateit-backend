@@ -31,8 +31,6 @@ const seriesSchema = new mongoose.Schema({
     default: 0
   },
 
-  simpleLikes: { type: Number, default: 0 },
-  simpleHates: { type: Number, default: 0 },
 
   averageRating: { 
     type: Number, 
@@ -40,14 +38,8 @@ const seriesSchema = new mongoose.Schema({
     min: 0,
     max: 10 
   },
-  
-  // ## ADDED MISSING FIELD ##
-  rankLabel: {
-    type: String,
-    default: 'F' 
-  },
-
   voteCount: { type: Number, default: 0 }, 
+  rankLabel: { type: String, default: 'N/A' },
 
   ratingDistribution: {
     F:   { type: Number, default: 0 },
