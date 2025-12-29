@@ -44,7 +44,20 @@ exports.getSeriesById = async (req, res) => {
   }
 };
 
-// ## Tap Series (Like/Hate with Spam Protection)
+// ## Get Current User's Ratings
+exports.getMyRatings = async (req, res) => {
+  try {
+    const ratings = await Rating.find({ user: req.user.id })
+      .populate('series', 'title coverImage')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: ratings.length, data: ratings });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+// ## Tap Series
 exports.tapSeries = async (req, res) => {
   try {
     const { type } = req.body;
@@ -88,7 +101,7 @@ exports.tapSeries = async (req, res) => {
   }
 };
 
-// ## Rank Series (Authenticated)
+// ## Rank Series
 exports.rankSeries = async (req, res) => {
   try {
     const { rank } = req.body;

@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 
 const seriesSchema = new mongoose.Schema({
-
-    
   title: {
     type: String,
     required: true,
@@ -16,11 +14,9 @@ const seriesSchema = new mongoose.Schema({
   releaseDate: Date,
   genres: [String],
 
-
   coverImage: String,   
   backdropImage: String, 
   trailerUrl: String,    
-
 
   source: {
     type: String,
@@ -35,12 +31,8 @@ const seriesSchema = new mongoose.Schema({
     default: 0
   },
 
-  
-
   simpleLikes: { type: Number, default: 0 },
   simpleHates: { type: Number, default: 0 },
-
-
 
   averageRating: { 
     type: Number, 
@@ -48,8 +40,14 @@ const seriesSchema = new mongoose.Schema({
     min: 0,
     max: 10 
   },
-  voteCount: { type: Number, default: 0 }, 
+  
+  // ## ADDED MISSING FIELD ##
+  rankLabel: {
+    type: String,
+    default: 'F' 
+  },
 
+  voteCount: { type: Number, default: 0 }, 
 
   ratingDistribution: {
     F:   { type: Number, default: 0 },
@@ -64,7 +62,6 @@ const seriesSchema = new mongoose.Schema({
 
   updatedAt: { type: Date, default: Date.now }
 });
-
 
 seriesSchema.index({ source: 1, externalId: 1 }, { unique: true });
 

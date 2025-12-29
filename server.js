@@ -7,7 +7,7 @@ const { exec } = require('child_process');
 const connectDB = require('./config/db');
 
 
-dotenv.config();
+dotenv.config({quiet: true });
 
 
 connectDB();
