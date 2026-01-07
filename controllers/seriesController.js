@@ -59,6 +59,23 @@ exports.updateLibraryStatus = async (req, res) => {
   }
 };
 
+exports.getUserRating = async (req, res) => {
+  try {
+    const seriesId = req.params.id;
+    const userId = req.user.id;
+
+    const rating = await Rating.findOne({ user: userId, series: seriesId });
+
+    if (!rating) {
+      return res.status(200).json({ success: true, rank: null });
+    }
+
+    res.status(200).json({ success: true, rank: rating.rank });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 exports.rankSeries = async (req, res) => {
   try {
     const { rank } = req.body;

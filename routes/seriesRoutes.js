@@ -4,7 +4,8 @@ const {
   getSeriesById, 
   updateLibraryStatus, 
   rankSeries,
-  getMyProfileData 
+  getMyProfileData,
+  getUserRating
 } = require('../controllers/seriesController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -15,6 +16,7 @@ router.get('/', getSeries);
 router.get('/my-profile', protect, getMyProfileData);
 router.post('/:id/library', protect, updateLibraryStatus);
 router.post('/:id/rank', protect, rankSeries);
+router.get('/:id/user-rating', protect, getUserRating);
 
 router.get('/:id', getSeriesById);
 
